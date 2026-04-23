@@ -1,13 +1,9 @@
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import gymnasium as gym
 import time
-from gymnasium.vector import SyncVectorEnv
-import matplotlib.pyplot as plt
-from collections import deque
 import random
 
 
@@ -55,16 +51,11 @@ class Agent:
     def _to_tensor(self, s):
         return torch.from_numpy(np.asarray(s, dtype=np.float32)).to(self.device)
 
-    def select_action(self, s, temp=None):
+    def select_action(self, s):
         s_tensor = self._to_tensor(s)
         s_tensor = s_tensor.unsqueeze(0)
 
-        if temp is None:
-            raise KeyError("Provide a temperature")
-
-        # print(q_values)
         logits = self.pol_net(s_tensor)
-        # print(logits)
         dist = torch.distributions.Categorical(logits=logits)
         a = dist.sample()
         log_prob = dist.log_prob(a)
@@ -107,7 +98,6 @@ class Agent:
 
                 probs = self.pol_net(s_tensor)
                 a = torch.argmax(probs, dim=1).item()
-                # a = self.select_action(s)
                 s_prime, r, terminated, truncated, _ = eval_env.step(a)
                 done = terminated or truncated
                 R_ep += r
@@ -122,16 +112,12 @@ class Agent:
         return np.mean(returns)
 
 
-def run(
+def reinforce_run(
     n_timesteps,
     max_episode_length,
     learning_rate,
     gamma,
-    policy='egreedy',
-    epsilon=None,
-    temp=None,
     hidden_dim=128,
-    env_steps_per_update=100,
     plot=False,
     eval_interval=500,
     n_eval_episodes=10,
@@ -152,9 +138,6 @@ def run(
     env = gym.make("CartPole-v1", render_mode="human" if plot else None)
     eval_env = gym.make("CartPole-v1")
 
-    # num_envs = 20
-    # envs = SyncVectorEnv([make_env for _ in range(num_envs)])
-
     obs_dim = env.observation_space.shape[0]
     n_actions = env.action_space.n
 
@@ -168,26 +151,23 @@ def run(
 
     eval_timesteps = []
     eval_returns = []
+    episode_log_probs = []
+    episode_rewards = []
+
+    s, _ = env.reset(seed=seed)
+    done = False
 
     for timestep in range(n_timesteps):
-        s, _ = env.reset(seed=seed)
+        a, log_prob = pi.select_action(s)
 
-        episode_log_probs = []
-        episode_rewards = []
+        s_next, r, terminated, truncated, _ = env.step(a)
+        done = terminated | truncated
+        
+        episode_log_probs.append(log_prob)
+        episode_rewards.append(r)
 
-        done = False
-        while not done:
-            a, log_prob = pi.select_action(s, temp=temp)
-
-            s_next, r, terminated, truncated, _ = env.step(a)
-            done = terminated | truncated
-            # print(done)
-
-            episode_log_probs.append(log_prob)
-            episode_rewards.append(r)
-
-            s = s_next
-
+        s = s_next
+        
         if timestep % eval_interval == 0:
             mean_return = pi.evaluate(
                 eval_env,
@@ -197,9 +177,13 @@ def run(
             eval_timesteps.append(timestep)
             eval_returns.append(mean_return)
         
-        returns = pi.calculate_returns(episode_rewards)
-        pi.update_batch(episode_log_probs, returns=returns)
+        if done:
+            returns = pi.calculate_returns(episode_rewards)
+            pi.update_batch(episode_log_probs, returns=returns)
 
+            episode_log_probs = []
+            episode_rewards = []
+            s, _ = env.reset(seed=seed)
 
     env.close()
     env.close()
@@ -209,9 +193,9 @@ def run(
 
 
 def test():
-    n_timesteps = 1000
-    max_episode_length = 800
-    eval_interval = 100
+    n_timesteps = 1_000_000
+    max_episode_length = 500
+    eval_interval = 500
     n_eval_episodes = 10
 
     gamma = 0.99
@@ -219,18 +203,16 @@ def test():
 
     policy = 'egreedy'
     epsilon = 0.1
-    temp = 1.0
 
     plot = False
 
-    eval_returns, eval_timesteps = run(
+    eval_returns, eval_timesteps = reinforce_run(
         n_timesteps=n_timesteps,
         max_episode_length=max_episode_length,
         learning_rate=learning_rate,
         gamma=gamma,
         policy=policy,
         epsilon=epsilon,
-        temp=temp,
         eval_interval = eval_interval,
         n_eval_episodes = n_eval_episodes,
         plot=plot
