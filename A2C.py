@@ -185,59 +185,78 @@ def A2C_run(
     eval_timesteps = []
     eval_returns = []
 
-    episode_log_probs = [[] for _ in range(num_envs)]
-    episode_rewards = [[] for _ in range(num_envs)]
-    episode_values = [[] for _ in range(num_envs)]
-    episode_lengths = np.zeros(num_envs)
-
-    s, _ = envs.reset(seed=seed)
-
     timestep = 0
+    next_eval_timestep = eval_interval
 
     while timestep < n_timesteps:
-        actions, log_probs, values = agent.select_action(s)
+        s, _ = envs.reset(seed=seed)
 
-        s_next, rewards, terminated, truncated, _ = envs.step(actions)
+        episode_log_probs = [[] for _ in range(num_envs)]
+        episode_rewards = [[] for _ in range(num_envs)]
+        episode_values = [[] for _ in range(num_envs)]
+        episode_lengths = np.zeros(num_envs)
+        finished = np.zeros(num_envs, dtype=bool)
 
-        episode_lengths += 1
+        while not finished.all() and timestep < n_timesteps:
+            actions, log_probs, values = agent.select_action(s)
 
-        done = (
-            terminated
-            | truncated
-            | (episode_lengths >= max_episode_length)
-        )
+            s_next, rewards, terminated, truncated, _ = envs.step(actions)
 
-        for i in range(num_envs):
-            episode_log_probs[i].append(log_probs[i])
-            episode_values[i].append(values[i])
-            episode_rewards[i].append(rewards[i])
+            episode_lengths += 1
 
-            if done[i]:
-                returns = agent.calculate_returns(episode_rewards[i])
-
-                agent.update_batch(
-                    episode_log_probs[i],
-                    episode_values[i],
-                    returns
-                )
-
-                episode_log_probs[i] = []
-                episode_rewards[i] = []
-                episode_values[i] = []
-                episode_lengths[i] = 0
-
-        s = s_next
-        timestep += num_envs
-
-        if timestep % eval_interval < num_envs:
-            mean_return = agent.evaluate(
-                eval_envs,
-                n_eval_episodes=n_eval_episodes,
-                max_episode_length=max_episode_length
+            done = (
+                terminated
+                | truncated
+                | (episode_lengths >= max_episode_length)
             )
 
-            eval_timesteps.append(timestep)
-            eval_returns.append(mean_return)
+            for i in range(num_envs):
+                if not finished[i]:
+                    episode_log_probs[i].append(log_probs[i])
+                    episode_values[i].append(values[i])
+                    episode_rewards[i].append(rewards[i])
+
+                    if done[i]:
+                        finished[i] = True
+
+            s = s_next
+            timestep += num_envs
+
+            if timestep >= next_eval_timestep:
+                mean_return = agent.evaluate(
+                    eval_envs,
+                    n_eval_episodes=n_eval_episodes,
+                    max_episode_length=max_episode_length
+                )
+
+                eval_timesteps.append(timestep)
+                eval_returns.append(mean_return)
+
+                print(
+                    f"Timestep {timestep}/{n_timesteps} | "
+                    f"Mean eval return: {mean_return:.2f}"
+                )
+
+                next_eval_timestep += eval_interval
+
+        all_log_probs = []
+        all_values = []
+        all_returns = []
+
+        for i in range(num_envs):
+            returns = agent.calculate_returns(episode_rewards[i])
+
+            all_log_probs.extend(episode_log_probs[i])
+            all_values.extend(episode_values[i])
+            all_returns.append(returns)
+
+        all_returns = torch.cat(all_returns)
+
+        agent.update_batch(
+            all_log_probs,
+            all_values,
+            all_returns
+        )
 
     envs.close()
     eval_envs.close()

@@ -1,1 +1,3 @@
 /.vscode
+/cartpole_comparison_results
+/__pycache__

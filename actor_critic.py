@@ -239,6 +239,11 @@ def actor_critic_run(
             eval_timesteps.append(timestep)
             eval_returns.append(mean_return)
 
+            print(
+                    f"Timestep {timestep}/{n_timesteps} | "
+                    f"Mean eval return: {mean_return:.2f}"
+                )
+
     envs.close()
     eval_envs.close()
 
