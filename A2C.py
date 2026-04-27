@@ -36,12 +36,14 @@ class Agent:
         learning_rate,
         gamma,
         hidden_dim=128,
+        use_advantage=True,
         device=None
     ):
         self.obs_dim = obs_dim
         self.n_actions = n_actions
         self.learning_rate = learning_rate
         self.gamma = gamma
+        self.use_advantage = use_advantage
 
         self.device = device if device is not None else (
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -83,7 +85,19 @@ class Agent:
 
         advantages = returns - values
 
-        actor_loss = -(log_probs * advantages.detach()).sum()
+        if self.use_advantage:
+            actor_signal = advantages.detach()
+        else:
+            actor_signal = returns.detach()
+
+        normalized_advantages = (
+            advantages - advantages.mean()
+        ) / (advantages.std(unbiased=False) + 1e-9)
+
+        actor_loss = -(log_probs * normalized_advantages.detach()).sum()
+
+        # actor_loss = -(log_probs * actor_signal).sum()
+
         critic_loss = advantages.pow(2).sum()
 
         loss = actor_loss + 0.5 * critic_loss
@@ -158,6 +172,7 @@ def A2C_run(
     eval_interval=500,
     n_eval_episodes=10,
     num_envs=20,
+    use_advantage=True,
     seed=None
 ):
     if seed is not None:
@@ -179,7 +194,8 @@ def A2C_run(
         n_actions,
         learning_rate,
         gamma,
-        hidden_dim=hidden_dim
+        hidden_dim=hidden_dim,
+        use_advantage=use_advantage
     )
 
     eval_timesteps = []
@@ -279,6 +295,7 @@ def test():
         max_episode_length=max_episode_length,
         learning_rate=learning_rate,
         gamma=gamma,
+        use_advantage=True,
         eval_interval=eval_interval,
         n_eval_episodes=n_eval_episodes,
         num_envs=num_envs,

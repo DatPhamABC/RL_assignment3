@@ -1,0 +1,52 @@
+Bottleneck @ file:///home/task_176193794808509/conda-bld/bottleneck_1761937988290/work
+brotlicffi @ file:///home/task_176496125431831/conda-bld/brotlicffi_1764961387175/work
+certifi @ file:///home/task_176765898807400/croot/certifi_1767659142395/work/certifi
+cffi @ file:///home/task_176183215827778/conda-bld/cffi_1761832774246/work
+charset-normalizer @ file:///home/task_176174482135433/conda-bld/charset-normalizer_1761744871447/work
+cloudpickle @ file:///home/task_176493044880617/conda-bld/cloudpickle_1764930491639/work
+contourpy @ file:///croot/contourpy_1732540045555/work
+cycler @ file:///home/task_176606789361081/croot/cycler_1766067914492/work
+Farama-Notifications @ file:///croot/farama-notifications_1683058702908/work
+filelock @ file:///home/task_176943957887863/croot/filelock_1769440496799/work
+fonttools @ file:///home/task_176544510956002/conda-bld/fonttools_1765445131112/work
+gmpy2 @ file:///home/task_176474799466805/conda-bld/gmpy2_1764748040727/work
+gymnasium @ file:///home/task_176795500467251/croot/gymnasium_1767955029077/work
+idna @ file:///home/task_176191177045451/conda-bld/idna_1761911980742/work
+Jinja2 @ file:///croot/jinja2_1741710844255/work
+kiwisolver @ file:///home/task_176415926973141/conda-bld/kiwisolver_1764159298569/work
+MarkupSafe @ file:///croot/markupsafe_1738584038848/work
+matplotlib==3.10.8
+mkl-service==2.4.0
+mkl_fft @ file:///io/mkl313/mkl_fft_1730824109137/work
+mkl_random @ file:///io/mkl313/mkl_random_1730823916628/work
+mpmath @ file:///croot/mpmath_1690848262763/work
+networkx @ file:///croot/networkx_1737039604450/work
+numexpr @ file:///croot/numexpr_1752521720723/work
+numpy @ file:///croot/numpy_and_numpy_base_1747238018250/work/dist/numpy-2.2.5-cp310-cp310-linux_x86_64.whl#sha256=5a6df30fd2c407292da04652f137bbbe50d4765b8e20b11b2e225dadf36c269e
+packaging @ file:///home/task_176104877067765/conda-bld/packaging_1761049113113/work
+pandas @ file:///home/conda/feedstock_root/build_artifacts/pandas_1764614464206/work
+patsy @ file:///home/task_176761426517241/croot/patsy_1767614325741/work
+pillow @ file:///home/task_177247536673546/croot/pillow_1772475408094/work
+pycparser @ file:///home/task_175749556993857/conda-bld/pycparser_1757496041120/work
+pygame==2.6.1
+pyparsing @ file:///home/task_176397361890982/conda-bld/pyparsing_1763973787669/work
+PyQt5==5.15.4
+PyQt5-sip==12.9.0
+PySocks @ file:///home/task_176175228103966/conda-bld/pysocks_1761753009555/work
+python-dateutil @ file:///croot/python-dateutil_1716495738603/work
+pytz @ file:///croot/pytz_1752135852232/work
+PyYAML @ file:///home/task_176346546342115/conda-bld/pyyaml_1763465494987/work
+requests @ file:///home/task_176235919024464/conda-bld/requests_1762359590301/work
+scipy @ file:///croot/scipy_1747238027288/work/dist/scipy-1.15.3-cp310-cp310-linux_x86_64.whl#sha256=4055d6b52bbbfc19594ac7c25008889945de175e153afc0935b6415716fa348e
+sip @ file:///home/conda/feedstock_root/build_artifacts/sip_1646101165171/work
+six @ file:///croot/six_1744271502820/work
+statsmodels @ file:///home/task_176553304061436/conda-bld/statsmodels_1765533112238/work
+sympy @ file:///home/task_176476278707978/conda-bld/sympy_1764762918518/work
+toml @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_toml_1764486833/work
+torch==2.5.1
+torchaudio==2.5.1
+torchvision==0.20.1
+tornado @ file:///home/task_176599246475085/croot/tornado_1765992643397/work
+typing_extensions @ file:///croot/typing_extensions_1756280817316/work
+tzdata @ file:///home/task_176829656558347/croot/python-tzdata_1768296637279/work
+urllib3 @ file:///home/task_176781015826610/croot/urllib3_1767810263778/work

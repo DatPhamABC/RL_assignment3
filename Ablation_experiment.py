@@ -11,8 +11,6 @@ from actor_critic import actor_critic_run
 from A2C import A2C_run
 
 
-# PARAMETERS
-
 N_TIMESTEPS = 1_000_000
 MAX_EPISODE_LENGTH = 500
 
@@ -38,22 +36,19 @@ PRINT_EVERY_SEED = True
 
 # EXPERIMENT
 
+
 def run_experiment():
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     algorithms = {
-        "REINFORCE": {
-            "run_fn": reinforce_run,
-            "extra_args": {},
-        },
-        "A2C with advantage": {
-            "run_fn": A2C_run,
-            "extra_args": {"use_advantage": True},
+            "Actor-Critic TD": {
+        "run_fn": actor_critic_run,
+        "extra_args": {"update_type": "td"},
         },
         "Actor-Critic MC": {
             "run_fn": actor_critic_run,
             "extra_args": {"update_type": "mc"},
-        },
+        }
     }
 
     all_results = {}
@@ -65,9 +60,7 @@ def run_experiment():
     for alg_name, alg_config in algorithms.items():
         run_fn = alg_config["run_fn"]
         extra_args = alg_config["extra_args"]
-        print(f"\n==============================")
         print(f"Running {alg_name}")
-        print(f"==============================")
 
         seed_returns = []
         seed_timesteps = []

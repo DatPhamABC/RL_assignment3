@@ -23,10 +23,8 @@ class ActorCriticNetwork(nn.Module):
 
     def forward(self, x):
         features = self.shared(x)
-
         logits = self.actor(features)
         q_values = self.critic(features)
-
         return logits, q_values
 
 
@@ -84,18 +82,23 @@ class Agent:
 
         return actions.cpu().numpy(), log_probs, q_values_selected
 
-    def update_td_batch(self, log_probs, q_values, rewards, next_states, dones):
-        rewards = torch.tensor(
-            rewards,
+    def calculate_returns(self, rewards):
+        returns = []
+        discount_return = 0
+
+        for r in reversed(rewards):
+            discount_return = r + self.gamma * discount_return
+            returns.insert(0, discount_return)
+
+        return torch.tensor(
+            returns,
             dtype=torch.float32,
             device=self.device
         )
 
-        dones = torch.tensor(
-            dones,
-            dtype=torch.float32,
-            device=self.device
-        )
+    def update_td_batch(self, log_probs, q_values, rewards, next_states, dones):
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
+        dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
 
         next_state_tensor = self._to_tensor(next_states)
 
@@ -103,15 +106,33 @@ class Agent:
             next_logits, next_q_values = self.ac_net(next_state_tensor)
             next_dist = torch.distributions.Categorical(logits=next_logits)
             next_probs = next_dist.probs
-
             expected_next_q = (next_probs * next_q_values).sum(dim=1)
 
             td_targets = rewards + self.gamma * expected_next_q * (1 - dones)
 
         td_errors = td_targets - q_values
 
-        actor_loss = -(log_probs * q_values.detach()).mean()
+        # actor_loss = -(log_probs * q_values.detach()).mean()
+        normalized_q = (
+            q_values - q_values.mean()
+        ) / (q_values.std(unbiased=False) + 1e-9)
+
+        actor_loss = -(log_probs * normalized_q.detach()).mean()
+
         critic_loss = td_errors.pow(2).mean()
+
+        loss = actor_loss + 0.5 * critic_loss
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+    def update_mc_batch(self, log_probs, q_values, returns):
+        log_probs = torch.stack(log_probs)
+        q_values = torch.stack(q_values)
+
+        actor_loss = -(log_probs * returns.detach()).sum()
+        critic_loss = (returns - q_values).pow(2).sum()
 
         loss = actor_loss + 0.5 * critic_loss
 
@@ -171,8 +192,12 @@ def actor_critic_run(
     eval_interval=500,
     n_eval_episodes=10,
     num_envs=20,
+    update_type="td",
     seed=None
 ):
+    if update_type not in ["td", "mc"]:
+        raise ValueError("update_type must be either 'td' or 'mc'")
+
     if seed is not None:
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -198,51 +223,125 @@ def actor_critic_run(
     eval_timesteps = []
     eval_returns = []
 
-    s, _ = envs.reset(seed=seed)
-    episode_lengths = np.zeros(num_envs)
-
     timestep = 0
+    next_eval_timestep = eval_interval
 
-    while timestep < n_timesteps:
-        actions, log_probs, q_values = agent.select_action(s)
+    if update_type == "td":
+        s, _ = envs.reset(seed=seed)
+        episode_lengths = np.zeros(num_envs)
 
-        s_next, rewards, terminated, truncated, _ = envs.step(actions)
+        while timestep < n_timesteps:
+            actions, log_probs, q_values = agent.select_action(s)
 
-        episode_lengths += 1
+            s_next, rewards, terminated, truncated, _ = envs.step(actions)
 
-        done = (
-            terminated
-            | truncated
-            | (episode_lengths >= max_episode_length)
-        )
+            episode_lengths += 1
 
-        agent.update_td_batch(
-            log_probs=log_probs,
-            q_values=q_values,
-            rewards=rewards,
-            next_states=s_next,
-            dones=done
-        )
-
-        episode_lengths[done] = 0
-
-        s = s_next
-        timestep += num_envs
-
-        if timestep % eval_interval < num_envs:
-            mean_return = agent.evaluate(
-                eval_envs,
-                n_eval_episodes=n_eval_episodes,
-                max_episode_length=max_episode_length
+            done = (
+                terminated
+                | truncated
+                | (episode_lengths >= max_episode_length)
             )
 
-            eval_timesteps.append(timestep)
-            eval_returns.append(mean_return)
+            agent.update_td_batch(
+                log_probs=log_probs,
+                q_values=q_values,
+                rewards=rewards,
+                next_states=s_next,
+                dones=done
+            )
 
-            print(
+            episode_lengths[done] = 0
+            s = s_next
+            timestep += num_envs
+
+            if timestep >= next_eval_timestep:
+                mean_return = agent.evaluate(
+                    eval_envs,
+                    n_eval_episodes=n_eval_episodes,
+                    max_episode_length=max_episode_length
+                )
+
+                eval_timesteps.append(timestep)
+                eval_returns.append(mean_return)
+
+                print(
                     f"Timestep {timestep}/{n_timesteps} | "
                     f"Mean eval return: {mean_return:.2f}"
                 )
+
+                next_eval_timestep += eval_interval
+
+    else:
+        while timestep < n_timesteps:
+            s, _ = envs.reset(seed=seed)
+
+            episode_log_probs = [[] for _ in range(num_envs)]
+            episode_q_values = [[] for _ in range(num_envs)]
+            episode_rewards = [[] for _ in range(num_envs)]
+            episode_lengths = np.zeros(num_envs)
+            finished = np.zeros(num_envs, dtype=bool)
+
+            while not finished.all() and timestep < n_timesteps:
+                actions, log_probs, q_values = agent.select_action(s)
+
+                s_next, rewards, terminated, truncated, _ = envs.step(actions)
+
+                episode_lengths += 1
+
+                done = (
+                    terminated
+                    | truncated
+                    | (episode_lengths >= max_episode_length)
+                )
+
+                for i in range(num_envs):
+                    if not finished[i]:
+                        episode_log_probs[i].append(log_probs[i])
+                        episode_q_values[i].append(q_values[i])
+                        episode_rewards[i].append(rewards[i])
+
+                        if done[i]:
+                            finished[i] = True
+
+                s = s_next
+                timestep += num_envs
+
+                if timestep >= next_eval_timestep:
+                    mean_return = agent.evaluate(
+                        eval_envs,
+                        n_eval_episodes=n_eval_episodes,
+                        max_episode_length=max_episode_length
+                    )
+
+                    eval_timesteps.append(timestep)
+                    eval_returns.append(mean_return)
+
+                    print(
+                        f"Timestep {timestep}/{n_timesteps} | "
+                        f"Mean eval return: {mean_return:.2f}"
+                    )
+
+                    next_eval_timestep += eval_interval
+
+            all_log_probs = []
+            all_q_values = []
+            all_returns = []
+
+            for i in range(num_envs):
+                returns = agent.calculate_returns(episode_rewards[i])
+
+                all_log_probs.extend(episode_log_probs[i])
+                all_q_values.extend(episode_q_values[i])
+                all_returns.append(returns)
+
+            all_returns = torch.cat(all_returns)
+
+            agent.update_mc_batch(
+                all_log_probs,
+                all_q_values,
+                all_returns
+            )
 
     envs.close()
     eval_envs.close()
@@ -268,6 +367,7 @@ def test():
         eval_interval=eval_interval,
         n_eval_episodes=n_eval_episodes,
         num_envs=num_envs,
+        update_type="td",
         plot=False
     )
 

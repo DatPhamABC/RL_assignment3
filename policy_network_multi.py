@@ -6,10 +6,7 @@ import matplotlib.pyplot as plt
 # Change this import if your DQN file has a different name
 from policy_network import reinforce_run
 
-
-# ============================================================
 # Settings
-# ============================================================
 
 base_output_dir = "experiment_results_policy_network"
 experiment_name = "policy_network_results_mid_settings_full_rep"
@@ -32,9 +29,7 @@ num_runs = 5
 
 base_seed = 42
 
-# ============================================================
 # Utility functions
-# ============================================================
 
 def summarize_results(eval_returns):
     """
@@ -136,9 +131,7 @@ def save_summary_json(results, output_dir):
         json.dump(summary_dict, f, indent=2)
 
 
-# ============================================================
 # Plotting
-# ============================================================
 
 def plot_results(results, output_dir):
     plt.figure(figsize=(10, 6))
@@ -165,9 +158,8 @@ def plot_results(results, output_dir):
     plt.close()
 
 
-# ============================================================
 # Main
-# ============================================================
+
 
 def main():
     os.makedirs(output_dir, exist_ok=True)
